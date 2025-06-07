@@ -18,7 +18,7 @@ Author: Yunho Cho
 """
 
 import argparse
-import shutil
+import subprocess
 import sys
 from pathlib import Path
 from datetime import datetime
@@ -126,11 +126,27 @@ def main():
     # --- Confirmation and Execution ---
     if args.yes or Confirm.ask("[bold]Do you want to apply these changes?[/]"):
         console.print("\n[bold]Starting synchronization...[/]")
-        with console.status("[bold green]Copying files...[/]") as status:
+        with console.status("[bold green]Syncing files with jupytext...[/]") as status:
             for op in operations:
                 source, dest = op['source'], op['dest']
-                status.update(f"[bold green]Copying[/] [cyan]{source.name}[/] -> [cyan]{dest.name}[/]")
-                shutil.copy2(source, dest) # copy2 preserves metadata
+                status.update(f"[bold green]Syncing[/] [cyan]{source.name}[/] -> [cyan]{dest.name}[/]")
+                try:
+                    # Use jupytext to sync. We can point to either file in the pair.
+                    # Jupytext will find the other and sync the older one.
+                    subprocess.run(
+                        ['jupytext', '--sync', str(source)],
+                        check=True,
+                        capture_output=True, # To hide jupytext output unless there's an error
+                        text=True
+                    )
+                except FileNotFoundError:
+                    console.print("[bold red]Error: 'jupytext' command not found.[/bold red]")
+                    console.print("Please install jupytext: [cyan]pip install jupytext[/cyan]")
+                    sys.exit(1)
+                except subprocess.CalledProcessError as e:
+                    console.print(f"[bold red]Error syncing {source.name}:[/bold red]")
+                    console.print(e.stderr)
+                    sys.exit(1)
         console.print("[bold green]✓ Synchronization complete![/]")
     else:
         console.print("[bold red]✗ Operation cancelled.[/]")
