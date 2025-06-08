@@ -3,7 +3,8 @@ A script to synchronize Jupyter notebooks (.ipynb) and Python scripts (.py).
 
 This script scans a specified directory for pairs of .py and .ipynb files
 with the same base name. It then compares their last modification times
-and copies the newer onto the older using `jupytext`.
+and syncs the newer file to the older one using `jupytext`, including
+the modification timestamp.
 
 This is useful for those who prefer to track Jupyter Notebooks in .py files.
 
@@ -20,6 +21,7 @@ Author: Yunho Cho
 import argparse
 import subprocess
 import sys
+import os
 from pathlib import Path
 from datetime import datetime
 
@@ -139,6 +141,11 @@ def main():
                         capture_output=True, # To hide jupytext output unless there's an error
                         text=True
                     )
+
+                    # Set the access and modification times of the destination file to match the source file
+                    source_stats = source.stat()
+                    # This will make the destination file's atime and mtime identical to the source file's
+                    os.utime(dest, (source_stats.st_atime, source_stats.st_mtime))
                 except FileNotFoundError:
                     console.print("[bold red]Error: 'jupytext' command not found.[/bold red]")
                     console.print("Please install jupytext: [cyan]pip install jupytext[/cyan]")
