@@ -9,14 +9,32 @@ from rich.text import Text
 # --- Configuration ---
 COMPRESSED_EXTENSIONS = {".zip", ".tar", ".gz", ".bz2", ".xz", ".rar", ".7z"}
 EXECUTABLE_EXTENSIONS = {
-    # Scripts
+    # Scripts and Interpreted Languages
     ".py",
     ".sh",
     ".bash",
     ".js",
+    ".ts",
+    ".php",
+    ".rb",
+    ".pl",
+    ".lua",
+    ".r",
     ".ps1",
     ".bat",
     ".cmd",
+    # Source files for Compiled Languages
+    ".c",
+    ".h",
+    ".cpp",
+    ".hpp",
+    ".cs",
+    ".java",
+    ".go",
+    ".rs",
+    ".swift",
+    ".kt",
+    ".kts",
     # Compiled binaries
     ".exe",
     ".app",
@@ -36,7 +54,7 @@ def get_file_style(path: Path) -> str:
     if path.suffix.lower() in COMPRESSED_EXTENSIONS:
         return "bold red"
 
-    # Check for common executable extensions first
+    # Check for common executable/source extensions first
     if path.suffix.lower() in EXECUTABLE_EXTENSIONS:
         return "bold green"
 
