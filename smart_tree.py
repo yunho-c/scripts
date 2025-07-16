@@ -8,6 +8,20 @@ from rich.text import Text
 
 # --- Configuration ---
 COMPRESSED_EXTENSIONS = {".zip", ".tar", ".gz", ".bz2", ".xz", ".rar", ".7z"}
+EXECUTABLE_EXTENSIONS = {
+    # Scripts
+    ".py",
+    ".sh",
+    ".bash",
+    ".js",
+    ".ps1",
+    ".bat",
+    ".cmd",
+    # Compiled binaries
+    ".exe",
+    ".app",
+    ".bin",
+}
 # --- End Configuration ---
 
 console = Console()
@@ -22,7 +36,11 @@ def get_file_style(path: Path) -> str:
     if path.suffix.lower() in COMPRESSED_EXTENSIONS:
         return "bold red"
 
-    # Check for executable permissions (for non-Windows systems)
+    # Check for common executable extensions first
+    if path.suffix.lower() in EXECUTABLE_EXTENSIONS:
+        return "bold green"
+
+    # Fallback check for executable permissions (for non-Windows systems)
     try:
         if os.name != "nt" and (path.stat().st_mode & stat.S_IXUSR):
             return "bold green"
