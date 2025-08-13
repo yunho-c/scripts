@@ -28,36 +28,28 @@ def generate_thumbnail(glb_path, output_path, resolution, overwrite=False):
     try:
         # Set up the plotter for off-screen rendering
         plotter = pv.Plotter(off_screen=True, window_size=[resolution, resolution])
-        # plotter = pv.Plotter(window_size=[resolution, resolution])
+        # plotter = pv.Plotter(window_size=[resolution, resolution])  # DEBUG
 
-        # Option 1.
-        # # Read the .glb file
-        # mesh = pv.read(glb_path)
-
-        # # Add the mesh to the plotter with some nice settings
-        # plotter.add_mesh(mesh, smooth_shading=True)
-
-        # Option 2. Directly import GLTF/GLB
+        # Directly import GLTF/GLB
         plotter.import_gltf(glb_path)
 
-        plotter.camera.up = (0, 1, 0)
-        # # plotter.camera.up = (0, 0, 1)
-        # plotter.reset_camera()
-
-        # for actor in plotter.actors.values():
-        #     # Rotate the actor -90 degrees on the X-axis to map Y-up to Z-up
-        #     actor.RotateX(-90)
-
-        # # Set the camera to an isometric view for a good default angle
+        # Set the camera to an isometric view for a good default angle
+        # Option 1
+        plotter.camera.up = (0, 1, 0)  # NOTE: doesn't really work with isometric...
+        # plotter.reset_camera(). # NOTE: didn't help
         # plotter.view_isometric()
-        plotter.view_vector(vector=[1, 1, 1], viewup=[0, 1, 0])
-        plotter.add_axes()  # DEBUG
 
-        # # Use parallel projection for a clearer, more technical look
+        # Option 2
+        plotter.view_vector(vector=[1, 1, 1], viewup=[0, 1, 0])
+
+        # Optional: add XYZ axes annotation gizmo
+        plotter.add_axes()
+
+        # # Optional: Use parallel projection for a clearer, more technical look
         # plotter.enable_parallel_projection()
 
         # Take a screenshot and save it
-        # plotter.show()
+        # plotter.show()  # DEBUG
         plotter.screenshot(output_path, transparent_background=True)
 
         # Clean up and close the plotter to free memory
