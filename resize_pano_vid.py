@@ -45,7 +45,6 @@ class EncoderConfig:
     label: str
     extra_input_args: tuple[str, ...] = ()
     extra_filter_suffix: str = ""
-    extra_output_args: tuple[str, ...] = ()
 
 
 def find_ffmpeg() -> str:
@@ -60,27 +59,6 @@ def find_ffmpeg() -> str:
         raise typer.Exit(code=1)
 
     return ffmpeg
-
-
-def available_encoders(ffmpeg: str) -> set[str]:
-    result = subprocess.run(
-        [ffmpeg, "-hide_banner", "-encoders"],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    encoders: set[str] = set()
-
-    for line in result.stdout.splitlines():
-        fields = line.split()
-
-        # Typical line:
-        # V....D hevc_nvenc  NVIDIA NVENC hevc encoder
-        if len(fields) >= 2 and fields[0].startswith("V"):
-            encoders.add(fields[1])
-
-    return encoders
 
 
 def quality_to_quantizer(quality: int) -> int:
@@ -104,15 +82,10 @@ def quality_to_videotoolbox(quality: int) -> int:
 
 
 def encoder_candidates(system: str) -> list[EncoderConfig]:
-    """
-    Return hardware encoders in a platform-appropriate preference order.
-
-    Encoder availability is still checked against the installed FFmpeg build.
-    """
+    """Return hardware encoders in a platform-appropriate preference order."""
     videotoolbox = EncoderConfig(
         name="hevc_videotoolbox",
         label="Apple VideoToolbox",
-        extra_output_args=("-allow_sw", "0"),
     )
 
     nvenc = EncoderConfig(
@@ -250,8 +223,6 @@ def probe_encoder(
         "-loglevel",
         "error",
         *encoder.extra_input_args,
-        "-hwaccel",
-        "auto",
         "-i",
         str(input_path),
         "-map",
@@ -286,18 +257,17 @@ def choose_encoder(
     width: int,
     quality: int,
     requested_encoder: str,
-    hardware_only: bool,
 ) -> EncoderConfig:
-    encoders = available_encoders(ffmpeg)
     system = platform.system()
 
     if requested_encoder != "auto":
-        if requested_encoder not in encoders:
+        try:
+            encoder_quality_args(requested_encoder, quality)
+        except ValueError as exc:
             raise typer.BadParameter(
-                f"Encoder '{requested_encoder}' is not included in this "
-                "FFmpeg build.",
+                str(exc),
                 param_hint="--encoder",
-            )
+            ) from exc
 
         candidate = next(
             (
@@ -328,9 +298,6 @@ def choose_encoder(
         return candidate
 
     for candidate in encoder_candidates(system):
-        if candidate.name not in encoders:
-            continue
-
         typer.echo(f"Testing {candidate.label}...")
 
         if probe_encoder(
@@ -342,34 +309,33 @@ def choose_encoder(
         ):
             return candidate
 
-    if hardware_only:
-        typer.secho(
-            "Error: no usable hardware HEVC encoder was found.",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(code=1)
-
-    if "libx265" not in encoders:
-        typer.secho(
-            "Error: no usable hardware HEVC encoder was found, and this "
-            "FFmpeg build does not include libx265.",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(code=1)
-
-    typer.secho(
-        "Warning: no usable hardware HEVC encoder was found; "
-        "falling back to libx265.",
-        fg=typer.colors.YELLOW,
-        err=True,
-    )
-
-    return EncoderConfig(
+    software_encoder = EncoderConfig(
         name="libx265",
         label="x265 software encoder",
     )
+    typer.echo(f"Testing {software_encoder.label}...")
+
+    if probe_encoder(
+        ffmpeg=ffmpeg,
+        input_path=input_path,
+        width=width,
+        quality=quality,
+        encoder=software_encoder,
+    ):
+        typer.secho(
+            "Warning: no usable hardware HEVC encoder was found; "
+            "falling back to libx265.",
+            fg=typer.colors.YELLOW,
+            err=True,
+        )
+        return software_encoder
+
+    typer.secho(
+        "Error: no usable hardware or software HEVC encoder was found.",
+        fg=typer.colors.RED,
+        err=True,
+    )
+    raise typer.Exit(code=1)
 
 
 def default_output_path(
@@ -467,13 +433,6 @@ def main(
             ),
         ),
     ] = "auto",
-    hardware_only: Annotated[
-        bool,
-        typer.Option(
-            "--hardware-only",
-            help="Fail instead of falling back to software HEVC encoding.",
-        ),
-    ] = False,
     audio: Annotated[
         bool,
         typer.Option(
@@ -538,15 +497,12 @@ def main(
         typer.echo("Use --overwrite to replace it.", err=True)
         raise typer.Exit(code=1)
 
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
     selected_encoder = choose_encoder(
         ffmpeg=ffmpeg,
         input_path=input_path,
         width=selected_width,
         quality=quality,
         requested_encoder=encoder.lower(),
-        hardware_only=hardware_only,
     )
 
     typer.secho(
@@ -563,8 +519,6 @@ def main(
         ffmpeg,
         "-hide_banner",
         *selected_encoder.extra_input_args,
-        "-hwaccel",
-        "auto",
         "-i",
         str(input_path),
         "-map",
@@ -607,6 +561,8 @@ def main(
 
     if dry_run:
         return
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     try:
         subprocess.run(
