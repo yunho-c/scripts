@@ -85,22 +85,22 @@ def available_encoders(ffmpeg: str) -> set[str]:
 
 def quality_to_quantizer(quality: int) -> int:
     """
-    Map user-facing quality 0..11 to a codec quantizer-like value.
+    Map user-facing quality 1..10 to a codec quantizer-like value.
 
-    0  -> 35: lower quality, smaller output
-    11 -> 15: higher quality, larger output
+    1  -> 35: lower quality, smaller output
+    10 -> 17: higher quality, larger output
     """
-    return round(35 - quality * (20 / 11))
+    return 37 - 2 * quality
 
 
 def quality_to_videotoolbox(quality: int) -> int:
     """
-    Map user-facing quality 0..11 to VideoToolbox's increasing quality scale.
+    Map user-facing quality 1..10 to VideoToolbox's increasing quality scale.
 
-    0  -> 25
-    11 -> 95
+    1  -> 25
+    10 -> 95
     """
-    return round(25 + quality * (70 / 11))
+    return round(25 + (quality - 1) * (70 / 9))
 
 
 def encoder_candidates(system: str) -> list[EncoderConfig]:
@@ -448,11 +448,11 @@ def main(
         typer.Option(
             "--quality",
             "-q",
-            min=0,
-            max=11,
+            min=1,
+            max=10,
             help=(
-                "Quality from 0 to 11. "
-                "0 is smallest/lowest quality; 11 is highest quality."
+                "Quality from 1 (smallest output) to 10 (highest quality). "
+                "8 is recommended."
             ),
         ),
     ] = 8,
@@ -557,7 +557,7 @@ def main(
         f"Resolution: {selected_width}x{selected_height} "
         f"({resolution_label})"
     )
-    typer.echo(f"Quality: {quality}/11")
+    typer.echo(f"Quality: {quality}/10")
 
     command = [
         ffmpeg,
